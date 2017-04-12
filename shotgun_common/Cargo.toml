@@ -1,0 +1,6 @@
+[package]
+name = "shotgun_common"
+version = "0.1.0"
+authors = ["vp"]
+
+[dependencies]

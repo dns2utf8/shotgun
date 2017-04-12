@@ -1,0 +1,11 @@
+[root]
+name = "coward_bot"
+version = "0.1.0"
+dependencies = [
+ "shotgun_common 0.1.0",
+]
+
+[[package]]
+name = "shotgun_common"
+version = "0.1.0"
+
