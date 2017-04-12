@@ -1,5 +1,5 @@
 [package]
-name = "shotgun"
+name = "shotgun_gameserver"
 version = "0.1.0"
 authors = ["Stefan Schindler <stefan@estada.ch>"]
 
