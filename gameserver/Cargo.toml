@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Stefan Schindler <stefan@estada.ch>"]
 
 [dependencies]
+shotgun_common = { path = "../shotgun_common" }
 docopt = "^0.6"
 rustc-serialize = "^0.3"

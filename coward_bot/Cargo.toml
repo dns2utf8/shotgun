@@ -1,7 +1,9 @@
 [package]
-name = "coward_bot"
+name = "shotgun_coward_bot"
 version = "0.1.0"
 authors = ["Stefan Schindler <dns2utf8@estada.ch>"]
 
 [dependencies]
 shotgun_common = { path = "../shotgun_common" }
+docopt = "^0.6"
+rustc-serialize = "^0.3"

@@ -13,9 +13,8 @@ struct Args {
 }
 
 static USAGE: &'static str = "
-Usage: shotgun [-s] [-p PORT] IP APIKEY
+Usage: shotgun_gameserver [-p PORT] IP APIKEY
 Options:
-    -s       ServerMode
     -p PORT  The port to listen on [default: 3000].
     IP       The socket address to listen on or connect to.
     APIKEY   Your Access Token.
@@ -33,4 +32,13 @@ fn main() {
     stream.write_all(args.arg_APIKEY.as_bytes()).unwrap();
     stream.write(b"\n");
     stream.flush();
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+    }
 }

@@ -1,6 +1,11 @@
 [package]
 name = "shotgun_common"
 version = "0.1.0"
-authors = ["vp"]
+authors = ["Stefan Schindler <dns2utf8@estada.ch>"]
 
 [dependencies]
+bytes = "0.4"
+futures = "0.1"
+tokio-io = "0.1"
+tokio-proto = "0.1"
+tokio-service = "0.1"
