@@ -2,6 +2,7 @@
 
 
 extern crate shotgun_common;
+extern crate rustc_serialize;
 
 use shotgun_common::*;
 

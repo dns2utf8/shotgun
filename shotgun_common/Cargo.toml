@@ -3,10 +3,6 @@ name = "shotgun_common"
 version = "0.1.0"
 authors = ["Stefan Schindler <dns2utf8@estada.ch>"]
 
-
-[build]
-target-dir = "../target"
-
 [dependencies]
 bytes = "0.4"
 futures = "0.1"
