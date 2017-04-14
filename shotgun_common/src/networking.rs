@@ -4,6 +4,7 @@ use std::io;
 use std::str;
 use bytes::{BytesMut, BufMut};
 use tokio_io::codec::{Encoder, Decoder};
+use tokio_proto::pipeline::ServerProto;
 
 pub enum ConnectionState {
     Connecting,
@@ -71,6 +72,49 @@ impl Decoder for LineCodec {
         } else {
             Ok(None)
         }
+    }
+}
+
+
+pub struct LineProto;
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::codec::Framed;
+
+impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
+    /// For this protocol style, `Request` matches the codec `In` type
+    type Request = String;
+
+    /// For this protocol style, `Response` matches the coded `Out` type
+    type Response = String;
+
+    /// A bit of boilerplate to hook in the codec:
+    type Transport = Framed<T, LineCodec>;
+    type BindTransport = Result<Self::Transport, io::Error>;
+    fn bind_transport(&self, io: T) -> Self::BindTransport {
+        Ok(io.framed(LineCodec))
+    }
+}
+
+
+pub struct Echo;
+use tokio_service::Service;
+use futures::{future, Future, BoxFuture};
+
+impl Service for Echo {
+    // These types must match the corresponding protocol types:
+    type Request = String;
+    type Response = String;
+
+    // For non-streaming protocols, service errors are always io::Error
+    type Error = io::Error;
+
+    // The future for computing the response; box it for simplicity.
+    type Future = BoxFuture<Self::Response, Self::Error>;
+
+    // Produce a future for computing a response from a request.
+    fn call(&self, req: Self::Request) -> Self::Future {
+        // In this case, the response is immediate.
+        future::ok(req).boxed()
     }
 }
 
