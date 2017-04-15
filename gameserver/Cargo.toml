@@ -8,4 +8,6 @@ shotgun_common = { path = "../shotgun_common" }
 docopt = "^0.7"
 rustc-serialize = "^0.3"
 
+futures = "0.1"
 tokio-proto = "0.1"
+tokio-service = "0.1"

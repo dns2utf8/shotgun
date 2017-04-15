@@ -6,6 +6,8 @@ use bytes::{BytesMut, BufMut};
 use tokio_io::codec::{Encoder, Decoder};
 use tokio_proto::pipeline::ServerProto;
 
+use ::*;
+
 pub enum ConnectionState {
     Connecting,
     Handshake,
@@ -41,21 +43,21 @@ impl LineFeeder {
 pub struct LineCodec;
 
 impl Encoder for LineCodec {
-    type Item = String;
+    type Item = ParsedLine;
     type Error = io::Error;
 
-    fn encode(&mut self, msg: String, buf: &mut BytesMut) -> io::Result<()> {
-        buf.extend(msg.as_bytes());
+    fn encode(&mut self, msg: ParsedLine, buf: &mut BytesMut) -> io::Result<()> {
+        buf.extend(msg.serialize().as_bytes());
         buf.extend(b"\n");
         Ok(())
     }
 }
 
 impl Decoder for LineCodec {
-    type Item = String;
+    type Item = ParsedLine;
     type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<String>> {
+    fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<Self::Item>> {
         if let Some(i) = buf.iter().position(|&b| b == b'\n') {
             // remove the serialized frame from the buffer.
             let line = buf.split_to(i);
@@ -64,11 +66,14 @@ impl Decoder for LineCodec {
             buf.split_to(1);
 
             // Turn this data into a UTF string and return it in a Frame.
-            match str::from_utf8(&line) {
-                Ok(s) => Ok(Some(s.to_string())),
-                Err(_) => Err(io::Error::new(io::ErrorKind::Other,
-                                             "invalid UTF-8")),
-            }
+            let s = str::from_utf8(&line)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, "invalid UTF-8") )
+                ?.to_string();
+
+            let line = s.parse()
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{:?}", e)) )?;
+
+            Ok(Some(line))
         } else {
             Ok(None)
         }
@@ -82,10 +87,10 @@ use tokio_io::codec::Framed;
 
 impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     /// For this protocol style, `Request` matches the codec `In` type
-    type Request = String;
+    type Request = ParsedLine;
 
     /// For this protocol style, `Response` matches the coded `Out` type
-    type Response = String;
+    type Response = ParsedLine;
 
     /// A bit of boilerplate to hook in the codec:
     type Transport = Framed<T, LineCodec>;
@@ -95,7 +100,7 @@ impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     }
 }
 
-
+/*
 pub struct Echo;
 use tokio_service::Service;
 use futures::{future, Future, BoxFuture};
@@ -116,7 +121,9 @@ impl Service for Echo {
         // In this case, the response is immediate.
         future::ok(req).boxed()
     }
-}
+}*/
+
+
 
 
 #[cfg(test)]

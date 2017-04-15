@@ -23,6 +23,8 @@ Options:
 ";
 
 fn main() {
+    // allways print backtrace
+    std::env::set_var("RUST_BACKTRACE", "1");
 
     let server_connection = ServerConnection::connect("localhost", None, "coward_bot").unwrap();
 
