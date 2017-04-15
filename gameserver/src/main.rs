@@ -87,8 +87,13 @@ impl Service for ArenaService {
     // Produce a future for computing a response from a request.
     fn call(&self, req: Self::Request) -> Self::Future {
         println!("call: {:?}", req);
+
+        let resp = ParsedLine {
+            game_id: req.game_id,
+            action: Action::Load,
+        };
         // In this case, the response is immediate.
-        future::ok(req).boxed()
+        future::ok(resp).boxed()
     }
 }
 
