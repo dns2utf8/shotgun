@@ -1,3 +1,4 @@
+/// Manage connecting clients and server arenas
 extern crate rustc_serialize;
 extern crate docopt;
 extern crate futures;
@@ -89,7 +90,7 @@ impl Service for ArenaService {
     fn call(&self, req: Self::Request) -> Self::Future {
         println!("call: {:?}", req);
 
-        if let MultiplexedMessage { game_id, action} = req {
+        if let MultiplexedMessage { game_id, action } = req {
             let resp = MultiplexedMessage {
                 game_id: game_id,
                 action: Action::Load,

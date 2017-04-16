@@ -5,7 +5,7 @@ use std::str;
 use bytes::{BytesMut, BufMut};
 use futures::{future, Future, BoxFuture, Stream, Sink};
 use tokio_io::codec::{Encoder, Decoder};
-use tokio_proto::pipeline::ServerProto;
+use tokio_proto::pipeline::{ServerProto, ClientProto};
 
 use ::*;
 
@@ -99,20 +99,19 @@ impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     type BindTransport = Box<Future<Item = Self::Transport,
                                    Error = io::Error>>;
     fn bind_transport(&self, io: T) -> Self::BindTransport {
-        let transport = io.framed(LineCodec);
+        let mut transport = io.framed(LineCodec);
 
-        println!("bind_transport");
-//         transport.send("Server Hello".into());
+        //transport.start_send(ServerHello { max_round_length: Duration::from_millis(200), }).poll_complete();
 
         let handshake = transport.into_future()
             // If the transport errors out, we don't care about
             // the transport anymore, so just keep the error
-            .map_err(|(e, _)| e)
+            .map_err(|(e, _t)| { println!("invalid Handshake: {:?}", e); e})
             .and_then(|(line, transport)| {
                 // A line has been received, check to see if it
                 // is the handshake
                 match line {
-                    Some(ref clientHello)/* { nickname, programming_language })*/ => {
+                    Some(ClientHello { ref nickname, ref programming_language }) => {
                         println!("SERVER: received client handshake");
                         // Send back the acknowledgement
                         let ret = transport.send(ServerHello {
@@ -136,28 +135,18 @@ impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     }
 }
 
+impl<T: AsyncRead + AsyncWrite + 'static> ClientProto<T> for LineProto {
+    type Request = ParsedLine;
+    type Response = ParsedLine;
 
-/*
-pub struct Echo;
-use tokio_service::Service;
+    /// `Framed<T, LineCodec>` is the return value of `io.framed(LineCodec)`
+    type Transport = Framed<T, LineCodec>;
+    type BindTransport = Result<Self::Transport, io::Error>;
 
-impl Service for Echo {
-    // These types must match the corresponding protocol types:
-    type Request = String;
-    type Response = String;
-
-    // For non-streaming protocols, service errors are always io::Error
-    type Error = io::Error;
-
-    // The future for computing the response; box it for simplicity.
-    type Future = BoxFuture<Self::Response, Self::Error>;
-
-    // Produce a future for computing a response from a request.
-    fn call(&self, req: Self::Request) -> Self::Future {
-        // In this case, the response is immediate.
-        future::ok(req).boxed()
+    fn bind_transport(&self, io: T) -> Self::BindTransport {
+        Ok(io.framed(LineCodec))
     }
-}*/
+}
 
 
 

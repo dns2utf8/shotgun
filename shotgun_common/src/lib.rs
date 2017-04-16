@@ -2,11 +2,11 @@ extern crate bytes;
 extern crate futures;
 extern crate tokio_io;
 extern crate tokio_proto;
-extern crate tokio_service;
+//extern crate tokio_service;
 
 pub mod networking;
 
-use std::time::Duration;
+pub use std::time::Duration;
 
 /// Parse like this:
 ///
@@ -53,7 +53,7 @@ pub enum ParsedLine {
     /// All the informations about a player
     ClientHello {
         nickname: String,
-        programming_languege: String,
+        programming_language: String,
     },
     /// The server may update the duration over time
     ServerHello {
@@ -70,9 +70,23 @@ pub enum ParsedLine {
 }
 use ParsedLine::*;
 
-pub struct ClientState {
+pub struct PlayerState {
+    /// Players primary key
+    pub nickname: String,
+    /// How much bullets are loaded?
     pub ammo_bag: u64,
+    /// Is it still alive?
     pub alive: bool,
+}
+
+
+/// Server perspective
+pub struct GameState {
+    pub game_id: u64,
+    /// When creating a new game, this player is first
+    pub left_player : Option<PlayerState>,
+    /// As soon as this player joins, the game begins
+    pub right_player: Option<PlayerState>,
 }
 
 #[derive(Debug,PartialEq)]
@@ -87,7 +101,7 @@ use ParseError::*;
 impl ParsedLine {
     fn serialize(&self) -> String {
         match self {
-            &ClientHello { ref nickname, ref programming_languege } => format!("Nickname: >{}<>{}", nickname, programming_languege),
+            &ClientHello { ref nickname, ref programming_language } => format!("Nickname: >{}<>{}", nickname, programming_language),
             &ServerHello { ref max_round_length } => format!("Shotgun Arena Server v0 :: max round length[ms]: {}", max_round_length.subsec_nanos() / 1_000_000),
             &MultiplexedMessage { ref game_id, ref action } => format!("{}:{:?}", game_id, action),
         }
@@ -103,7 +117,7 @@ impl std::str::FromStr for ParsedLine {
 
             return Ok(ClientHello {
                 nickname: nick[..nick.len()-1].into(),
-                programming_languege: to_parse_error( parts.next() )?.into(),
+                programming_language: to_parse_error( parts.next() )?.into(),
             })
         }
 
@@ -168,7 +182,7 @@ mod tests {
         let s = "Nickname: >dns2utf8<>rust";
         let obj = ClientHello {
             nickname: "dns2utf8".into(),
-            programming_languege: "rust".into(),
+            programming_language: "rust".into(),
         };
         assert_eq!(obj, s.parse().unwrap());
     }
@@ -178,7 +192,7 @@ mod tests {
         let s = "Nickname: >dns2utf8<>rust";
         let obj = ClientHello {
             nickname: "dns2utf8".into(),
-            programming_languege: "rust".into(),
+            programming_language: "rust".into(),
         };
         assert_eq!(s, obj.serialize());
     }
