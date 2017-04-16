@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use tokio_proto::TcpServer;
 use shotgun_common::*;
+use shotgun_common::ParsedLine::*;
 use shotgun_common::networking::*;
 
 #[derive(Debug,RustcDecodable)]
@@ -88,12 +89,16 @@ impl Service for ArenaService {
     fn call(&self, req: Self::Request) -> Self::Future {
         println!("call: {:?}", req);
 
-        let resp = ParsedLine {
-            game_id: req.game_id,
-            action: Action::Load,
-        };
-        // In this case, the response is immediate.
-        future::ok(resp).boxed()
+        if let MultiplexedMessage { game_id, action} = req {
+            let resp = MultiplexedMessage {
+                game_id: game_id,
+                action: Action::Load,
+            };
+            // In this case, the response is immediate.
+            future::ok(resp).boxed()
+        } else {
+            future::err(io::Error::new(io::ErrorKind::Other, "invalid client state")).boxed()
+        }
     }
 }
 

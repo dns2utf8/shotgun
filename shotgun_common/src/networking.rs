@@ -3,6 +3,7 @@
 use std::io;
 use std::str;
 use bytes::{BytesMut, BufMut};
+use futures::{future, Future, BoxFuture, Stream, Sink};
 use tokio_io::codec::{Encoder, Decoder};
 use tokio_proto::pipeline::ServerProto;
 
@@ -92,18 +93,53 @@ impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     /// For this protocol style, `Response` matches the coded `Out` type
     type Response = ParsedLine;
 
-    /// A bit of boilerplate to hook in the codec:
+    // `Framed<T, LineCodec>` is the return value of
+    // `io.framed(LineCodec)`
     type Transport = Framed<T, LineCodec>;
-    type BindTransport = Result<Self::Transport, io::Error>;
+    type BindTransport = Box<Future<Item = Self::Transport,
+                                   Error = io::Error>>;
     fn bind_transport(&self, io: T) -> Self::BindTransport {
-        Ok(io.framed(LineCodec))
+        let transport = io.framed(LineCodec);
+
+        println!("bind_transport");
+//         transport.send("Server Hello".into());
+
+        let handshake = transport.into_future()
+            // If the transport errors out, we don't care about
+            // the transport anymore, so just keep the error
+            .map_err(|(e, _)| e)
+            .and_then(|(line, transport)| {
+                // A line has been received, check to see if it
+                // is the handshake
+                match line {
+                    Some(ref clientHello)/* { nickname, programming_language })*/ => {
+                        println!("SERVER: received client handshake");
+                        // Send back the acknowledgement
+                        let ret = transport.send(ServerHello {
+                            max_round_length: Duration::from_millis(200),
+                        });
+                        Box::new(ret) as Self::BindTransport
+                    }
+                    _ => {
+                        // The client sent an unexpected handshake,
+                        // error out the connection
+                        println!("SERVER: client handshake INVALID");
+                        let err = io::Error::new(io::ErrorKind::Other,
+                                                 "invalid handshake");
+                        let ret = future::err(err);
+                        Box::new(ret) as Self::BindTransport
+                    }
+                }
+            });
+
+        Box::new(handshake)
     }
 }
+
 
 /*
 pub struct Echo;
 use tokio_service::Service;
-use futures::{future, Future, BoxFuture};
 
 impl Service for Echo {
     // These types must match the corresponding protocol types:

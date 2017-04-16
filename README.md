@@ -18,8 +18,8 @@ After the handshake each line is prefixed with a global game id.
 ## Grammar
 
 ```
-ClientHello     := "Programming Language" '\n' "Nickname"
-ServerHello     := 'Shotgun Arena Server v0' ProtocolVersion
+ClientHello     := 'Nickname: >' "Nickname" '<>' "Programming Language"
+ServerHello     := 'Shotgun Arena Server v' ProtocolVersion ' :: max round length[ms]: ' u64
 ProtocolVersion := '0'
 Message         := u64 ':' MessageBody
 MessageBody     := 'Timeout' | 'Duck' | 'Load' | 'Shoot' | 'Klick' | 'WinRound' | 'LoseRound'
