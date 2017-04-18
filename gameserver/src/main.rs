@@ -79,12 +79,12 @@ impl ArenaServer {
         })
     }
 
-    fn find_or_create_arena(player: PlayerState) -> Box<Future<Item = LineProto, Error = io::Error>> {
+    /*fn find_or_create_arena(player: PlayerState) -> Box<Future<Item = LineProto, Error = io::Error>> {
         future::ok(MultiplexedMessage {
             game_id: 0,
             action: Action::NewGame { opponent: "me".into() },
         }).boxed()
-    }
+    }*/
 }
 
 use tokio_service::Service;
@@ -115,7 +115,12 @@ impl Service for ArenaService {
                 future::ok(resp).boxed()
             }
             RequestNewGame => {
-                self.server.find_or_create_arena()
+                //self.server.find_or_create_arena()
+                let resp = MultiplexedMessage {
+                    game_id: 0,
+                    action: Action::NewGame { opponent: "me".into() },
+                };
+                future::ok(resp).boxed()
             }
             _ => future::err(io::Error::new(io::ErrorKind::Other, "invalid client state")).boxed()
         }

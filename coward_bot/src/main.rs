@@ -6,6 +6,7 @@ extern crate tokio_core;
 extern crate tokio_proto;
 extern crate tokio_service;
 extern crate shotgun_common;
+// #[macro_use] extern crate lazy_static;
 
 
 use std::io;
@@ -45,6 +46,8 @@ Options:
     --nickname=<NAME>  The nickname of this instance [default: \"coward_bot\"]
 ";
 
+
+
 fn main() {
     // allways print backtrace
     std::env::set_var("RUST_BACKTRACE", "1");
@@ -67,11 +70,21 @@ fn main() {
                 })
                 //.for_each(|msg| {})
                 .and_then(move |response| {
-                    println!(" <- {:?}", response);
-                    client.call(RequestNewGame)
+                    println!(" <-0 {:?}", response);
+                    let request = RequestNewGame;
+                    println!(" ->0 {:?}", request);
+                    client.call(request)
                     .and_then(move |response| {
-                        println!(" <- {:?}", response);
-                        client.call(response.answer(Load))
+                        println!(" <-1 {:?}", response);
+                        let request = response.answer(Load);
+                        println!(" ->1 {:?}", request);
+                        client.call(request)
+                        .and_then(move |response| {
+                            println!(" <-2 {:?}", response);
+                            let request = response.answer(Shoot);
+                            println!(" ->2 {:?}", request);
+                            client.call(request)
+                        })
                     })
                 })
                 /*.and_then(|response| {
@@ -82,7 +95,8 @@ fn main() {
 
 
     //let (_socket, data) =
-    core.run(client).unwrap();
+    let result = core.run(client);
+    println!("\n  Client result: {:?}", result);
     //println!("{}", String::from_utf8_lossy(&data));
 }
 

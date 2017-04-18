@@ -109,6 +109,7 @@ impl ParsedLine {
             &MultiplexedMessage { ref game_id, ref action } => format!("{}:{:?}", game_id, action),
         }
     }
+    /// This works with `MultiplexedMessage` only!
     pub fn answer(&self, new_action: Action) -> Self {
         match self {
             &MultiplexedMessage { ref game_id, ref action } => MultiplexedMessage { game_id: *game_id, action: new_action },
@@ -143,7 +144,7 @@ impl std::str::FromStr for ParsedLine {
             })
         }
 
-        let mut parts = s.split(':');
+        let mut parts = s.splitn(2, ':');
 
         Ok(MultiplexedMessage {
             game_id: parts.next().unwrap().parse().map_err(|e| InvalidGameId(e))?,
@@ -155,6 +156,7 @@ impl std::str::FromStr for ParsedLine {
 impl std::str::FromStr for Action {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        println!("DD: Action::from_str({:?})", s);
         match s {
             "Timeout"        => Ok(Timeout       ),
             "Duck"           => Ok(Duck          ),
@@ -165,8 +167,19 @@ impl std::str::FromStr for Action {
             "LoseRound"      => Ok(LoseRound     ),
             "StalemateRound" => Ok(StalemateRound),
             "ErrorEnd"       => Ok(ErrorEnd      ),
-            text       => Err(InvalidAction(
-                                format!("invalid Action: {:?}", text))),
+            text => {
+                let prefix = "NewGame { opponent: \"";
+                let suffix = "\" }";
+                if text.starts_with(prefix) && text.ends_with(suffix) {
+                    let start = prefix.len();
+                    let end = text.len() - suffix.len();
+                    Ok(NewGame { opponent: text[start..end].into() })
+                } else {
+                    let msg = format!("invalid Action: {:?}", text);
+                    println!("DD: Action::from_str({:?}) => {:?}", text, msg);
+                    Err(InvalidAction(msg))
+                }
+            },
         }
     }
 }
@@ -241,6 +254,25 @@ mod tests {
     }
 
     #[test]
+    fn parse_zero_new_game() {
+        let s = "0:NewGame { opponent: \"me\" }";
+        let obj = MultiplexedMessage {
+            game_id: 0,
+            action: NewGame { opponent: "me".into() }
+        };
+        assert_eq!(obj, s.parse().unwrap());
+    }
+    #[test]
+    fn encode_zero_new_game() {
+        let s = "0:NewGame { opponent: \"me\" }";
+        let obj = MultiplexedMessage {
+            game_id: 0,
+            action: NewGame { opponent: "me".into() }
+        };
+        assert_eq!(s, obj.serialize());
+    }
+
+    #[test]
     fn parse_ten_duck() {
         let resp = "10:Duck".parse().unwrap();
         assert_eq!(MultiplexedMessage {
@@ -248,7 +280,6 @@ mod tests {
             action: Duck,
         }, resp);
     }
-
     #[test]
     fn encode_ten_duck() {
         let pl = MultiplexedMessage {
@@ -256,6 +287,19 @@ mod tests {
             action: Duck,
         };
         assert_eq!("10:Duck".to_string(), pl.serialize());
+    }
+
+    #[test]
+    fn parse_new_game() {
+        let resp = "NewGame { opponent: \"me\" }".parse().unwrap();
+        let obj = NewGame { opponent: "me".into() };
+        assert_eq!(obj, resp);
+    }
+    #[test]
+    fn encode_new_game() {
+        let resp = "NewGame { opponent: \"me\" }";
+        let obj = format!("{:?}", NewGame { opponent: "me".into() });
+        assert_eq!(resp, obj);
     }
 
     #[test]

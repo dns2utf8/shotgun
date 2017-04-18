@@ -70,9 +70,11 @@ impl Decoder for LineCodec {
             let s = str::from_utf8(&line)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, "invalid UTF-8") )
                 ?.to_string();
+            println!("DD: decode0: {:?}", s);
 
             let line = s.parse()
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{:?}", e)) )?;
+            println!("DD: decode1: {:?}", line);
 
             Ok(Some(line))
         } else {
@@ -158,6 +160,8 @@ impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     }
 }
 
+
+/// Not so much implemented for Clients here, pass everything along
 impl<T: AsyncRead + AsyncWrite + 'static> ClientProto<T> for LineProto {
     type Request = ParsedLine;
     type Response = ParsedLine;
