@@ -60,6 +60,8 @@ pub enum ParsedLine {
         max_round_length: Duration,
     },
 
+    RequestNewGame,
+
     /// Messages about a round
     MultiplexedMessage {
         /// Global Game ID
@@ -103,7 +105,14 @@ impl ParsedLine {
         match self {
             &ClientHello { ref nickname, ref programming_language } => format!("Nickname: >{}<>{}", nickname, programming_language),
             &ServerHello { ref max_round_length } => format!("Shotgun Arena Server v0 :: max round length[ms]: {}", max_round_length.subsec_nanos() / 1_000_000),
+            &RequestNewGame => format!("RequestNewGame"),
             &MultiplexedMessage { ref game_id, ref action } => format!("{}:{:?}", game_id, action),
+        }
+    }
+    pub fn answer(&self, new_action: Action) -> Self {
+        match self {
+            &MultiplexedMessage { ref game_id, ref action } => MultiplexedMessage { game_id: *game_id, action: new_action },
+            _ => panic!("ParsedLine::answer()"),
         }
     }
 }
@@ -111,6 +120,10 @@ impl ParsedLine {
 impl std::str::FromStr for ParsedLine {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "RequestNewGame" {
+            return Ok(RequestNewGame)
+        }
+
         if s.starts_with("Nickname: >") {
             let mut parts = s.split('>').skip(1);
             let nick = to_parse_error( parts.next() )?;
@@ -211,6 +224,19 @@ mod tests {
         let obj = ServerHello {
             max_round_length: Duration::from_millis(200),
         };
+        assert_eq!(s, obj.serialize());
+    }
+
+    #[test]
+    fn parse_request_new_game() {
+        let s = "RequestNewGame";
+        let obj = RequestNewGame;
+        assert_eq!(obj, s.parse().unwrap());
+    }
+    #[test]
+    fn encode_request_new_game() {
+        let s = "RequestNewGame";
+        let obj = RequestNewGame;
         assert_eq!(s, obj.serialize());
     }
 

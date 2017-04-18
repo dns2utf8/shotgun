@@ -82,7 +82,16 @@ impl Decoder for LineCodec {
 }
 
 
-pub struct LineProto;
+pub struct LineProto {
+    client_hello: Option<ParsedLine>,
+}
+impl LineProto {
+    pub fn new() -> LineProto {
+        LineProto {
+            client_hello: None,
+        }
+    }
+}
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_io::codec::Framed;
 
@@ -101,13 +110,20 @@ impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     fn bind_transport(&self, io: T) -> Self::BindTransport {
         let mut transport = io.framed(LineCodec);
 
+        // FIXME this is dark magic!
+        let selfptr: *mut LineProto = unsafe {
+            std::mem::transmute::<*const LineProto, *mut LineProto>(self)
+        };
+
         //transport.start_send(ServerHello { max_round_length: Duration::from_millis(200), }).poll_complete();
 
         let handshake = transport.into_future()
             // If the transport errors out, we don't care about
             // the transport anymore, so just keep the error
             .map_err(|(e, _t)| { println!("invalid Handshake: {:?}", e); e})
-            .and_then(|(line, transport)| {
+            .and_then(move |(line, transport)| {
+                // type `(std::option::Option<ParsedLine>, tokio_io::codec::Framed<T, networking::LineCodec>)`
+
                 // A line has been received, check to see if it
                 // is the handshake
                 match line {
@@ -117,6 +133,13 @@ impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
                         let ret = transport.send(ServerHello {
                             max_round_length: Duration::from_millis(200),
                         });
+                        unsafe {
+                            // FIXME this is dark magic!
+                            (*selfptr).client_hello = Some(ClientHello {
+                                nickname: nickname.clone(),
+                                programming_language: programming_language.clone(),
+                            });
+                        }
                         Box::new(ret) as Self::BindTransport
                     }
                     _ => {

@@ -12,6 +12,7 @@ extern crate shotgun_common;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use tokio_proto::TcpServer;
 use shotgun_common::*;
@@ -48,7 +49,7 @@ fn main() {
     let addr = (&*touple).parse::<SocketAddr>().unwrap();
 
     // The builder requires a protocol and an address
-    let server = TcpServer::new(LineProto, addr);
+    let server = TcpServer::new(LineProto::new(), addr);
 
     let arena_server = ArenaServer::new();
 
@@ -59,7 +60,12 @@ fn main() {
     }));
 }
 
-pub struct ArenaServer {}
+pub struct ArenaServer {
+    /// wins and losts for everyone
+    player_statistics: HashMap<String, (u64, u64)>,
+    /// List of active games/arenas
+    arenas: Vec<GameState>,
+}
 
 pub struct ArenaService {
     server: Arc<ArenaServer>,
@@ -68,7 +74,16 @@ pub struct ArenaService {
 impl ArenaServer {
     fn new() -> Arc<ArenaServer> {
         Arc::new(ArenaServer {
+            player_statistics: HashMap::new(),
+            arenas: Vec::new(),
         })
+    }
+
+    fn find_or_create_arena(player: PlayerState) -> Box<Future<Item = LineProto, Error = io::Error>> {
+        future::ok(MultiplexedMessage {
+            game_id: 0,
+            action: Action::NewGame { opponent: "me".into() },
+        }).boxed()
     }
 }
 
@@ -90,15 +105,19 @@ impl Service for ArenaService {
     fn call(&self, req: Self::Request) -> Self::Future {
         println!("call: {:?}", req);
 
-        if let MultiplexedMessage { game_id, action } = req {
-            let resp = MultiplexedMessage {
-                game_id: game_id,
-                action: Action::Load,
-            };
-            // In this case, the response is immediate.
-            future::ok(resp).boxed()
-        } else {
-            future::err(io::Error::new(io::ErrorKind::Other, "invalid client state")).boxed()
+        match req {
+            MultiplexedMessage { game_id, action } => {
+                let resp = MultiplexedMessage {
+                    game_id: game_id,
+                    action: Action::Load,
+                };
+                // In this case, the response is immediate.
+                future::ok(resp).boxed()
+            }
+            RequestNewGame => {
+                self.server.find_or_create_arena()
+            }
+            _ => future::err(io::Error::new(io::ErrorKind::Other, "invalid client state")).boxed()
         }
     }
 }

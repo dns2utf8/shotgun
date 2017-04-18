@@ -22,6 +22,7 @@ use tokio_service::{Service, NewService};
 
 use shotgun_common::*;
 use shotgun_common::ParsedLine::*;
+use shotgun_common::Action::*;
 use shotgun_common::networking::*;
 
 #[derive(Debug,RustcDecodable)]
@@ -58,12 +59,25 @@ fn main() {
     let handle = core.handle();
     let addr = (&*touple).to_socket_addrs().unwrap().next().unwrap();
 
-    let client = Client::connect(&addr, &handle, &args.flag_nickname)
+    let client = Client::connect(&addr, &handle)
             .and_then(|client| {
                 client.call(ClientHello {
-                    nickname: "test".into(),
+                    nickname: args.flag_nickname.clone(),
                     programming_language: "rust".into(),
                 })
+                //.for_each(|msg| {})
+                .and_then(move |response| {
+                    println!(" <- {:?}", response);
+                    client.call(RequestNewGame)
+                    .and_then(move |response| {
+                        println!(" <- {:?}", response);
+                        client.call(response.answer(Load))
+                    })
+                })
+                /*.and_then(|response| {
+                    println!("Server: {:?}", response);
+                    client.call(response.answer(Load))
+                })*/
             });
 
 
@@ -73,24 +87,20 @@ fn main() {
 }
 
 struct Client {
-    nickname: String,
     inner: ClientService<TcpStream, LineProto>,
 }
 
 impl Client {
     /// Establish a connection to a multiplexed line-based server at the
     /// provided `addr`.
-    pub fn connect(addr: &SocketAddr, handle: &Handle, nickname: &String) -> Box<Future<Item = Client, Error = io::Error>> {
-        let nickname = nickname.clone();
-
-        let ret = TcpClient::new(LineProto)
+    pub fn connect(addr: &SocketAddr, handle: &Handle) -> Box<Future<Item = Client, Error = io::Error>> {
+        let ret = TcpClient::new(LineProto::new())
             .connect(addr, handle)
             .map(move |client_service| {
                 //let validate = Validate { inner: client_service};
                 //Client { inner: validate }
                 Client {
                     inner: client_service,
-                    nickname: nickname,
                 }
             });
 
