@@ -9,7 +9,8 @@ Each message is terminated with a `\n` newline.
 
 ## Handshake
 
-![Image of Handshake](handshake.png)
+The handshake must be initialized from the client by sending a correct `ClientHello`.
+After the server responds with the `ServerHello` the conversation enters the multiplexed phase.
 
 ## Multiplexing
 
@@ -24,3 +25,11 @@ ProtocolVersion := '0'
 Message         := u64 ':' MessageBody
 MessageBody     := 'Timeout' | 'Duck' | 'Load' | 'Shoot' | 'Klick' | 'WinRound' | 'LoseRound'
 ```
+
+# TODO
+
+  - [X] Define protocol
+  - [X] Handshake
+  - [ ] Correct bot
+  - [ ] Server match-makeing
+  - [ ] Server releay communication / Arena mode
