@@ -16,31 +16,7 @@ pub enum ConnectionState {
 }
 use self::ConnectionState::*;
 
-/*
-pub struct LineFeeder {
-    connection: TcpStream,
-    nickname: String,
-    state: ConnectionState,
-}
 
-impl LineFeeder {
-    pub fn connect<S: Into<String>>(remote_host_port: (S, u16), nickname: S) -> ::std::io::Result<LineFeeder> {
-        let (host, port) = remote_host_port;
-        let nickname = nickname.into();
-
-        let mut stream = TcpStream::connect(&*(format!("{}:{}", host.into(), port)))?;
-
-        let client_hello = format!("{}\n{}\n", "rust", nickname);
-        stream.write_all(client_hello.as_bytes())?;
-
-        Ok(LineFeeder {
-            connection: stream,
-            nickname: nickname,
-            state: Handshake,
-        })
-    }
-}
-*/
 pub struct LineCodec;
 
 impl Encoder for LineCodec {
@@ -70,11 +46,9 @@ impl Decoder for LineCodec {
             let s = str::from_utf8(&line)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, "invalid UTF-8") )
                 ?.to_string();
-            println!("DD: decode0: {:?}", s);
 
             let line = s.parse()
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{:?}", e)) )?;
-            println!("DD: decode1: {:?}", line);
 
             Ok(Some(line))
         } else {

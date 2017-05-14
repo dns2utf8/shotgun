@@ -87,10 +87,6 @@ fn main() {
                         })
                     })
                 })
-                /*.and_then(|response| {
-                    println!("Server: {:?}", response);
-                    client.call(response.answer(Load))
-                })*/
             });
 
 

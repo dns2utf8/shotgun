@@ -156,7 +156,6 @@ impl std::str::FromStr for ParsedLine {
 impl std::str::FromStr for Action {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        println!("DD: Action::from_str({:?})", s);
         match s {
             "Timeout"        => Ok(Timeout       ),
             "Duck"           => Ok(Duck          ),
@@ -176,7 +175,6 @@ impl std::str::FromStr for Action {
                     Ok(NewGame { opponent: text[start..end].into() })
                 } else {
                     let msg = format!("invalid Action: {:?}", text);
-                    println!("DD: Action::from_str({:?}) => {:?}", text, msg);
                     Err(InvalidAction(msg))
                 }
             },
