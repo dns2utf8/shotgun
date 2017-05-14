@@ -109,7 +109,7 @@ impl Service for ArenaService {
             MultiplexedMessage { game_id, action } => {
                 let resp = MultiplexedMessage {
                     game_id: game_id,
-                    action: Action::Load,
+                    action: Action::PlayerInput(RoundAction::Load),
                 };
                 // In this case, the response is immediate.
                 future::ok(resp).boxed()
@@ -118,7 +118,7 @@ impl Service for ArenaService {
                 //self.server.find_or_create_arena()
                 let resp = MultiplexedMessage {
                     game_id: 0,
-                    action: Action::NewGame { opponent: "me".into() },
+                    action: Action::NewGame { player_name_a: "me".into(), player_name_b: "you".into() },
                 };
                 future::ok(resp).boxed()
             }

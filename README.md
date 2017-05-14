@@ -25,18 +25,36 @@ The `RequestNewGame` message does not need to be multiplexed.
 ## Grammar
 
 ```
-ClientHello     := 'Nickname: >' "Nickname" '<>' "Programming Language"
-ServerHello     := 'Shotgun Arena Server v' ProtocolVersion ' :: max round length[ms]: ' u64
-ProtocolVersion := '0'
-RequestNewGame  := 'RequestNewGame'
-Message         := u64 ':' MessageBody
-MessageBody     := 'Timeout' | 'Duck' | 'Load' | 'Shoot' | 'Klick' | 'WinRound' | 'LoseRound'
+ClientHello        := 'Nickname: >' "Nickname" '<>' "Programming Language"
+ServerHello        := 'Shotgun Arena Server v' ProtocolVersion ' :: max round length[ms]: ' u64
+ProtocolVersion    := '0'
+RequestNewGame     := 'RequestNewGame'
+MultiplexedMessage := u64 ':' Action
+Action             := 'NewGame { player_name_a: ' String ', player_name_b: ' String ' }' | 'WinGame' | 'LoseGame' | RoundAction | 'RoundResult { a: ' RoundAction ', b: ' RoundAction ' }' | 'ErrorEnd'
+RoundAction        := 'Timeout' | 'Duck' | 'Load' | 'Shoot' | 'Klick'
+```
+
+## Example communication
+
+Client messages are prefixed with `< `, server messages with `> `.
+All messages are terminated with `\n`:
+
+```
+< ClientHello { nickname: "me" }
+> ServerHello
+< RequestNewGame
+> '13:NewGame { player_name_a: "me", player_name_b: "some bot" }'
+< '13:Load'
+> '13:RoundResult { a: Load, b: Load }'
+< '13:Shoot'
+> '13:RoundResult { a: Shoot, b: Load }'
+> '13:WinGame'
 ```
 
 # TODO
 
   - [X] Define protocol
   - [X] Handshake
-  - [ ] Correct bot
+  - [X] Correct bot
   - [ ] Server match-makeing
   - [ ] Server releay communication / Arena mode

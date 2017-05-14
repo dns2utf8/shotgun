@@ -8,6 +8,7 @@ const LOAD = 'Load'
   , WIN = 'WinRound'
   , LOOSE = 'LooseRound'
   , NEW_GAME = 'NewGame'
+  , ROUND_RESULT = 'RoundResult'
   , REQUEST_NEW_GAME = 'RequestNewGame'
   , CLIENT_HELLO = 'Nickname: >dns2utf8<>javascript'
   , SERVER_HELLO = 'Shotgun Arena Server v0 :: max round length[ms]: 200'
@@ -33,10 +34,12 @@ client.on('data', (data) => {
   }
 });
 client.on('end', () => {
-  console.log('disconnected from server');
+  console.log('disconnected from server; buf: '+buf);
+  rl.close();
 });
 client.on('error', (err) => {
   console.log('ERROR: ' + err);
+  rl.close();
 });
 
 function proto_handler(msg) {
@@ -52,11 +55,13 @@ function proto_handler(msg) {
     const command = msg.substr(seperator + 1);
 
     console.log('> '+ [game_id, command])
-    if (command.startsWith('NewGame')) {
-      game_states[game_id] = {};
+    if (command.startsWith(NEW_GAME)) {
+      game_states[game_id] = { bullets: 0 };
       respond(game_id, LOAD);
     } else if (command.startsWith(WIN) || command.startsWith(LOOSE)) {
       client.write('RequestNewGame\n');
+    } else if (command.startsWith(ROUND_RESULT)) {
+      // ignore for now
     } else {
       var game = game_states[game_id];
       if (game.bullets > 0) {
@@ -70,7 +75,7 @@ function proto_handler(msg) {
 
 function respond(game_id, command) {
   const answer = ''+game_id + ':' + command;
-  client.write(answer);
+  client.write(answer + '\n');
   console.log('< ' + answer);
 
   game_states[game_id].last_command = command;
@@ -81,3 +86,16 @@ function respond(game_id, command) {
     game_states[game_id].bullets -= 1;
   }
 }
+
+
+///////////////////////////////////////////////////////////////////////////////////
+const readline = require('readline');
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+rl.on('line', (input) => {
+  //console.log(`Received: ${input}`);
+  console.log(game_states);
+});

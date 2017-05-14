@@ -12,13 +12,35 @@ pub use std::time::Duration;
 ///
 /// ```
 /// # use shotgun_common::Action;
-/// let action: Action = "Load".parse().unwrap();
+/// let action: Action = "WinGame".parse().unwrap();
 /// ```
 #[derive(Debug,PartialEq)]
 pub enum Action {
     /// Starts a new game in this game_id with the opponent
-    NewGame { opponent: String },
+    NewGame { player_name_a: String, player_name_b: String },
 
+    /// Ends round and game
+    WinGame,
+    /// Ends round and game
+    LoseGame,
+
+    PlayerInput(RoundAction),
+    /// Ends round
+    RoundResult { a: RoundAction, b: RoundAction },
+
+    /// Some error happend and this game is over
+    ErrorEnd,
+}
+use Action::*;
+
+/// All the commands clients can send
+///
+/// ```
+/// # use shotgun_common::RoundAction;
+/// let action: RoundAction = "Load".parse().unwrap();
+/// ```
+#[derive(Debug, PartialEq)]
+pub enum RoundAction {
     /// Client did not respont this round
     Timeout,
     /// Hide, you can not be hit
@@ -29,18 +51,8 @@ pub enum Action {
     Shoot,
     /// Result, when an opponent tried to shoot without a bullet
     Klick,
-
-    /// Ends round
-    WinRound,
-    /// Ends round
-    LoseRound,
-    /// Ends round
-    StalemateRound,
-
-    /// Some error happend and this game is over
-    ErrorEnd,
 }
-use Action::*;
+use RoundAction::*;
 
 /// Implements parsing and encoding:
 ///
@@ -106,7 +118,14 @@ impl ParsedLine {
             &ClientHello { ref nickname, ref programming_language } => format!("Nickname: >{}<>{}", nickname, programming_language),
             &ServerHello { ref max_round_length } => format!("Shotgun Arena Server v0 :: max round length[ms]: {}", max_round_length.subsec_nanos() / 1_000_000),
             &RequestNewGame => format!("RequestNewGame"),
-            &MultiplexedMessage { ref game_id, ref action } => format!("{}:{:?}", game_id, action),
+            &MultiplexedMessage { ref game_id, ref action } => {
+                // Obmit the PlayerInput(...)
+                if let &PlayerInput(ref command) = action {
+                    format!("{}:{:?}", game_id, command)
+                } else {
+                    format!("{}:{:?}", game_id, action)
+                }
+            },
         }
     }
     /// This works with `MultiplexedMessage` only!
@@ -157,26 +176,60 @@ impl std::str::FromStr for Action {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "WinGame"       => Ok(WinGame      ),
+            "LoseGame"      => Ok(LoseGame     ),
+            "ErrorEnd"       => Ok(ErrorEnd      ),
+            text => {
+                let prefix = "NewGame { player_name_a: \"";
+                let suffix = "\" }";
+                if text.starts_with(prefix) && text.ends_with(suffix) {
+                    let start_a = prefix.len();
+                    let end_a = follow_quoted_str(text, start_a +1) -1;
+                    let start_b = end_a + "\", player_name_b: \"".len();
+                    let end_b = text.len() - suffix.len();
+                    Ok(NewGame {
+                        player_name_a: text[start_a..end_a].into(),
+                        player_name_b: text[start_b..end_b].into(),
+                    })
+
+                } else {
+                    let prefix = "RoundResult { a: ";
+                    let suffix = " }";
+                    if text.starts_with(prefix) && text.ends_with(suffix) {
+                        let mut iter = text.split_whitespace().skip(3);
+                        let (a, _, b) = (iter.next(), iter.next(), iter.next());
+                        let mut a = a.unwrap_or("Timeout,").to_string();
+                        a.pop();
+                        Ok(RoundResult {
+                            a: a.parse()?,
+                            b: b.unwrap_or("Timeout").parse()?,
+                        })
+
+                    } else {
+                        if let Ok(pi) = text.parse() {
+                            Ok(PlayerInput(pi))
+                        } else {
+                            let msg = format!("invalid Action: {:?}", text);
+                            Err(InvalidAction(msg))
+                        }
+                    }
+                }
+            },
+        }
+    }
+}
+impl std::str::FromStr for RoundAction {
+    type Err = ParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
             "Timeout"        => Ok(Timeout       ),
             "Duck"           => Ok(Duck          ),
             "Load"           => Ok(Load          ),
             "Shoot"          => Ok(Shoot         ),
             "Klick"          => Ok(Klick         ),
-            "WinRound"       => Ok(WinRound      ),
-            "LoseRound"      => Ok(LoseRound     ),
-            "StalemateRound" => Ok(StalemateRound),
-            "ErrorEnd"       => Ok(ErrorEnd      ),
             text => {
-                let prefix = "NewGame { opponent: \"";
-                let suffix = "\" }";
-                if text.starts_with(prefix) && text.ends_with(suffix) {
-                    let start = prefix.len();
-                    let end = text.len() - suffix.len();
-                    Ok(NewGame { opponent: text[start..end].into() })
-                } else {
-                    let msg = format!("invalid Action: {:?}", text);
-                    Err(InvalidAction(msg))
-                }
+                let msg = format!("invalid Action: {:?}", text);
+                Err(InvalidAction(msg))
             },
         }
     }
@@ -195,6 +248,25 @@ pub fn to_io_err<T>(o: Option<T>) -> Result<T, std::io::Error> {
         Some(v) => Ok(v),
         None => Err(io::Error::new(io::ErrorKind::Other, "expected value")),
     }
+}
+
+/// Offset must be at '" and end will be at '"' again
+fn follow_quoted_str(buf: &str, offset: usize) -> usize {
+    let mut escape = false;
+    let mut i = offset + 1;
+
+    for c in buf.as_bytes().iter().skip(i) {
+        i += 1;
+
+        match *c {
+            b'\\' => { escape = !escape; },
+            b'"' if escape => { escape = !escape; },
+            b'"' => return i,
+            _ => { () },
+        };
+    }
+
+    i
 }
 
 #[cfg(test)]
@@ -253,50 +325,64 @@ mod tests {
 
     #[test]
     fn parse_zero_new_game() {
-        let s = "0:NewGame { opponent: \"me\" }";
+        let s = "0:NewGame { player_name_a: \"me\", player_name_b: \"you\" }";
         let obj = MultiplexedMessage {
             game_id: 0,
-            action: NewGame { opponent: "me".into() }
+            action: NewGame { player_name_a: "me".into(), player_name_b: "you".into() }
         };
         assert_eq!(obj, s.parse().unwrap());
     }
     #[test]
     fn encode_zero_new_game() {
-        let s = "0:NewGame { opponent: \"me\" }";
+        let s = "0:NewGame { player_name_a: \"me\", player_name_b: \"you\" }";
         let obj = MultiplexedMessage {
             game_id: 0,
-            action: NewGame { opponent: "me".into() }
+            action: NewGame { player_name_a: "me".into(), player_name_b: "you".into() }
         };
         assert_eq!(s, obj.serialize());
     }
 
     #[test]
     fn parse_ten_duck() {
-        let resp = "10:Duck".parse().unwrap();
-        assert_eq!(MultiplexedMessage {
+        let resp = "10:Duck".parse();
+        let obj = MultiplexedMessage {
             game_id: 10,
-            action: Duck,
-        }, resp);
+            action: PlayerInput(Duck),
+        };
+        assert_eq!(Ok(obj), resp);
     }
     #[test]
     fn encode_ten_duck() {
         let pl = MultiplexedMessage {
             game_id: 10,
-            action: Duck,
+            action: PlayerInput(Duck),
         };
         assert_eq!("10:Duck".to_string(), pl.serialize());
     }
 
     #[test]
     fn parse_new_game() {
-        let resp = "NewGame { opponent: \"me\" }".parse().unwrap();
-        let obj = NewGame { opponent: "me".into() };
+        let resp = "NewGame { player_name_a: \"me\", player_name_b: \"you\" }".parse().unwrap();
+        let obj = NewGame { player_name_a: "me".into(), player_name_b: "you".into() };
         assert_eq!(obj, resp);
     }
     #[test]
     fn encode_new_game() {
-        let resp = "NewGame { opponent: \"me\" }";
-        let obj = format!("{:?}", NewGame { opponent: "me".into() });
+        let resp = "NewGame { player_name_a: \"me\", player_name_b: \"you\" }";
+        let obj = format!("{:?}", NewGame { player_name_a: "me".into(), player_name_b: "you".into() });
+        assert_eq!(resp, obj);
+    }
+
+    #[test]
+    fn parse_round_result() {
+        let resp = "RoundResult { a: Duck, b: Load }".parse().unwrap();
+        let obj = RoundResult { a: Duck, b: Load };
+        assert_eq!(obj, resp);
+    }
+    #[test]
+    fn encode_round_result() {
+        let resp = "RoundResult { a: Duck, b: Load }";
+        let obj = format!("{:?}", RoundResult { a: Duck, b: Load });
         assert_eq!(resp, obj);
     }
 
@@ -321,16 +407,12 @@ mod tests {
         assert_eq!(Ok(Klick), "Klick".parse())
     }
     #[test]
-    fn parse_win_round() {
-        assert_eq!(Ok(WinRound), "WinRound".parse())
+    fn parse_win_game() {
+        assert_eq!(Ok(WinGame), "WinGame".parse())
     }
     #[test]
-    fn parse_lose_round() {
-        assert_eq!(Ok(LoseRound), "LoseRound".parse())
-    }
-    #[test]
-    fn parse_stalemate_round() {
-        assert_eq!(Ok(StalemateRound), "StalemateRound".parse())
+    fn parse_lose_game() {
+        assert_eq!(Ok(LoseGame), "LoseGame".parse())
     }
     #[test]
     fn parse_error_end() {
@@ -339,5 +421,13 @@ mod tests {
     #[test]
     fn parse_invalid_action() {
         assert_eq!(Err(InvalidAction("invalid Action: \"blubb\"".to_string())), "blubb".parse::<Action>())
+    }
+
+    #[test]
+    fn check_follow_quoted_str() {
+        let s = "ab: \"blubbeln zu zweit\", def: \"asldfj\"";
+        let (start, end) = (4, 23);
+        assert_eq!(end, follow_quoted_str(&s, start));
+        assert_eq!("\"blubbeln zu zweit\"", &s[start..end]);
     }
 }
